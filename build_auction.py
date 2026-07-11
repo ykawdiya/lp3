@@ -331,6 +331,82 @@ for t in range(1, NUM_TEAMS + 1):
     ws.column_dimensions["B"].width = 14
 
 # =========================================================================
+# SUMMARY : all 15 teams in one sheet, laid out like the uploaded file
+#           (3 row-blocks x 5 column-blocks), fully linked to the Auction data
+# =========================================================================
+summ = wb.create_sheet("Summary", index=2)   # after Auction & Balance
+summ.sheet_properties.tabColor = GREEN
+SLOTS = 15  # player rows per block (matches the uploaded sheet)
+
+# column trios for the 5 blocks: (S.No col, Player col, Amount col)
+COL_TRIOS = [(2, 3, 4), (6, 7, 8), (10, 11, 12), (14, 15, 16), (18, 19, 20)]
+# per row-block: (name_row, header_row, first_player_row, spent_row, left_row, total_row)
+ROW_BLOCKS = [(2, 3, 4, 19, 20, 21),
+              (23, 24, 25, 40, 41, 42),
+              (44, 45, 46, 61, 62, 63)]
+
+rng_c = "Auction!$C$%d:$C$%d" % (first_data, DATA_LAST)
+base  = "ROW(Auction!$C$%d:$C$%d)-ROW(Auction!$C$%d)+1" % (first_data, DATA_LAST, first_data)
+
+# column widths (narrow spacers between blocks)
+summ.column_dimensions["A"].width = 2
+for (sno, pl, amt) in COL_TRIOS:
+    summ.column_dimensions[get_column_letter(sno)].width = 5
+    summ.column_dimensions[get_column_letter(pl)].width = 22
+    summ.column_dimensions[get_column_letter(amt)].width = 9
+for spacer in (5, 9, 13, 17):
+    summ.column_dimensions[get_column_letter(spacer)].width = 2
+
+for idx in range(NUM_TEAMS):
+    g, cpos = idx // 5, idx % 5
+    sno_c, pl_c, amt_c = COL_TRIOS[cpos]
+    name_r, hdr_r, p0, spent_r, left_r, total_r = ROW_BLOCKS[g]
+    bal_row = 4 + idx
+    L_sno, L_pl, L_amt = (get_column_letter(sno_c), get_column_letter(pl_c),
+                          get_column_letter(amt_c))
+    name_cell = "$%s$%d" % (L_sno, name_r)   # criteria = team name cell
+
+    # --- team name (merged across the 3 columns), linked to Balance ---
+    summ.merge_cells(start_row=name_r, start_column=sno_c, end_row=name_r, end_column=amt_c)
+    nc = summ.cell(name_r, sno_c, "=Balance!$A$%d" % bal_row)
+    nc.font = font(bold=True, size=12, color=WHITE); nc.fill = fill(NAVY); nc.alignment = center
+    summ.row_dimensions[name_r].height = 22
+
+    # --- header row ---
+    for cc, htxt in ((sno_c, "S.No"), (pl_c, "Player Name"), (amt_c, "Amount")):
+        h = summ.cell(hdr_r, cc, htxt)
+        h.font = font(bold=True, color=WHITE); h.fill = fill(BLUE)
+        h.alignment = center; h.border = border_all
+
+    # --- player rows (S.No static 1..15; name/amount auto-filled) ---
+    for k in range(SLOTS):
+        r = p0 + k
+        small = "SMALL(IF(%s=%s,%s),%d)" % (rng_c, name_cell, base, k + 1)
+        fa = '=IFERROR(INDEX(Auction!$A$%d:$A$%d,%s),"")' % (first_data, DATA_LAST, small)
+        fb = '=IFERROR(INDEX(Auction!$B$%d:$B$%d,%s),"")' % (first_data, DATA_LAST, small)
+        sc = summ.cell(r, sno_c, k + 1); sc.alignment = center; sc.border = border_all
+        pc = summ.cell(r, pl_c); pc.value = ArrayFormula("%s%d" % (L_pl, r), fa)
+        pc.alignment = left; pc.border = border_all
+        ac = summ.cell(r, amt_c); ac.value = ArrayFormula("%s%d" % (L_amt, r), fb)
+        ac.alignment = right; ac.border = border_all; ac.number_format = MONEY
+        if k % 2 == 1:
+            sc.fill = fill(GREY); pc.fill = fill(GREY); ac.fill = fill(GREY)
+
+    # --- totals block (label spans S.No+Player cols; value in Amount col) ---
+    totals = [(spent_r, "Total Amount Spent", "=Balance!$C$%d" % bal_row, GREY),
+              (left_r,  "Total Amount Left",  "=Balance!$D$%d" % bal_row, GREENFILL),
+              (total_r, "Total Amount",       "=Balance!$B$%d" % bal_row, LIGHTBLUE)]
+    for rr, label, formula, bg in totals:
+        summ.merge_cells(start_row=rr, start_column=sno_c, end_row=rr, end_column=pl_c)
+        lc = summ.cell(rr, sno_c, label)
+        lc.font = font(bold=True); lc.alignment = right; lc.fill = fill(bg); lc.border = border_all
+        vc = summ.cell(rr, amt_c, formula)
+        vc.font = font(bold=True); vc.number_format = MONEY; vc.alignment = right
+        vc.fill = fill(bg); vc.border = border_all
+
+summ.sheet_view.showGridLines = False
+
+# =========================================================================
 out = "Cricket_Auction_Tracker.xlsx"
 wb.save(out)
 print("saved:", out)

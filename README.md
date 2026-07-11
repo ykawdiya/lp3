@@ -13,6 +13,7 @@ All prices are in **crores**. The decimals are lakhs: `1.20` = 1 cr 20 lakh,
 |-------|---------------|
 | **Auction** | Master list — one row per sold player: `Player · Price (Cr) · Team`. The Team column has a drop-down of the 15 teams. |
 | **Balance** | Purse / Spent / Balance / Players for every team, plus a totals row. This sheet is the source of truth for team names. |
+| **Summary** | All 15 teams on one page in the original grid layout (3×5 blocks of `S.No · Player Name · Amount` with Spent / Left / Total per team). Fully linked — updates automatically from the Auction sheet. |
 | One sheet per franchise | Each team's purse, spend, remaining balance, and the auto-filled list of players it bought. |
 
 The workbook is **pre-loaded** with the Invictus auction bid data — 15 teams
