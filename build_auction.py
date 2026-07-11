@@ -43,6 +43,69 @@ right  = Alignment(horizontal="right",  vertical="center")
 
 MONEY = "0.00"
 
+# ---- real bid data (from Auction_Sheet_Invictus) -------------------------
+# (team name, [(player, amount_in_Cr), ...])   amounts verified vs source totals
+TEAMS_DATA = [
+    ("Mumbai Indians", [
+        ("Rohit Sharma", 26.5), ("Kartik Tyagi", 12), ("Kuldeep Yadav", 20),
+        ("Hugh Weibgen", 1), ("Matthew Potts", 5), ("Chamika Karunaratne", 0.5),
+        ("Karun Nair", 5.75), ("Sachin Baby", 1.75), ("Anrich Nortje", 7)]),
+    ("Royal Challangers Banglore", [
+        ("Navdeep Saini", 2.25), ("Harnoor Singh", 2.25), ("Swastik Chikara", 7.5),
+        ("Tilak Varma", 22.5), ("Dawid Malan", 7), ("Haris Rauf", 8.5),
+        ("George Scrimshaw", 0.5), ("Hasan Ali", 3.5), ("Usma Mir", 2.25),
+        ("Jimmy Neesham", 6), ("Parth Rekhade", 1.25), ("Dinesh Bana", 1),
+        ("Yuzvendra Chahal", 12)]),
+    ("Chennai Super Kings", [
+        ("Sandeep Sharma", 8), ("Sarafaz Khan", 13), ("Arjun Tendulkar", 6.25),
+        ("Ruturaj Gaikwad", 18.5), ("Romario Shepherd", 8.5), ("Tom Latham", 4.25),
+        ("Shaheen Shah Afridi", 6.25), ("Naseem Shah", 7), ("Mohammad Amir", 2.25),
+        ("Akhil", 0.5)]),
+    ("Kolkata Knight Riders", [
+        ("Devdutt Padikkal", 19.5), ("Vaibhav Suryavanshi", 16.5), ("Sikandar Raza", 7),
+        ("Ashutosh Sharma", 10.5), ("Dharmendrasinh Jadeja", 3.25), ("Sameer Rizvi", 8.75),
+        ("T. Natarajan", 8.25)]),
+    ("Patna Panthers", [
+        ("Umesh Yadav", 4.25), ("Liam Livingstone", 13), ("Rahul Tripathi", 7.25),
+        ("Suryakumar Yadav", 21.5), ("Tim Seifert", 9), ("Spencer Johnson", 5.75)]),
+    ("Sunrisers Hydrabad", [
+        ("Lhuan-dré Pretorius", 3), ("KL Rahul", 29), ("Angkrish Raghuvanshi", 12.5),
+        ("Mohammed Siraj", 14.5), ("Baba Indrajith", 2.5)]),
+    ("Delhi Capitals", [
+        ("Nitish Rana", 11), ("Ben McKinney", 6.5), ("Keshav Maharaj", 8.25),
+        ("Abrar Ahmed", 8), ("Faf Du Plesis", 12.5), ("Rajat Patidar", 18.5)]),
+    ("Gujarat Titans", [
+        ("Rinku Singh", 14.5), ("Sai Sudharsan", 23.5), ("Ishaan Kishaan", 24.5),
+        ("Govinda Poddar", 0.5)]),
+    ("Lucknow Super Giants", [
+        ("Sanju Samson", 19.5), ("Dewald Brevis", 10), ("Mayank Dagar", 1.5),
+        ("Abhishek Sharma", 16)]),
+    ("Imphal Igniter", [
+        ("Shaik Rasheed", 5.5), ("Chetan Sakariya", 6.25), ("Quinton de Kock", 19),
+        ("Joe Root", 5.5), ("Virat Kohli", 27.5), ("Vidwath Kaverappa", 2),
+        ("Siddharth Desai", 2.75)]),
+    ("Punjab Kings", [
+        ("Ishant Sharma", 5.5), ("Deepak Hooda", 4.5), ("Sam Konstas", 6),
+        ("Jitesh Sharma", 10.25), ("Shubman Gill", 28), ("Mitchell Starc", 13)]),
+    ("Rising Pune Super Giants", [
+        ("Jasprit Bumrah", 24.25), ("Moeen Ali", 10), ("Will Jacks", 15.5),
+        ("Dasun Shanaka", 5.75), ("Amit Shukla", 1.75), ("Abhishek Powel", 8.5)]),
+    ("Rajasthan Royals", [
+        ("Harpreet Bhatia", 1), ("Musheer Khan", 6.5), ("Avesh Khan", 14.5),
+        ("MS Dhoni", 15), ("Glenn Maxwell", 12.5), ("Tom Bruce", 0.5),
+        ("Harry Dixon", 0.5), ("Ajinkya Rahane", 8.75), ("Priyansh Arya", 16.5)]),
+    ("Kochi Tuskers", [
+        ("Jason Holder", 14.5), ("Kagiso Rabada", 22), ("Heinrich Klassen", 30),
+        ("Nikhil Gangta", 0.5)]),
+    ("Guwahati Chargers", [
+        ("Hardik Pandya", 26), ("Shakib Al Hasan", 9), ("Nehal Wadhera", 6),
+        ("Rishabh Pant", 17), ("Wiaan Mulder", 4.75), ("Maheesh Theekshana", 5.75)]),
+]
+TEAMS = [t[0] for t in TEAMS_DATA]
+assert len(TEAMS_DATA) == NUM_TEAMS
+# flattened auction rows: (player, price, team)
+AUCTION_ROWS = [(pl, amt, name) for name, roster in TEAMS_DATA for pl, amt in roster]
+
 wb = Workbook()
 wb.calculation = CalcProperties(fullCalcOnLoad=True)   # force recalc on open
 
@@ -86,16 +149,9 @@ au.column_dimensions["A"].width = 30
 au.column_dimensions["B"].width = 14
 au.column_dimensions["C"].width = 16
 
-# Example rows so the template visibly works (safe to overwrite / delete)
-examples = [
-    ("Player_X", 2.00, "Team 4"),
-    ("Rohit S.", 3.50, "Team 1"),
-    ("Bumrah",   4.20, "Team 4"),
-    ("Kohli",    5.00, "Team 7"),
-    ("Jadeja",   1.20, "Team 1"),
-]
+# Real bid data (grouped by team, in roster order)
 first_data = 5
-for r, (p, price, team) in enumerate(examples, start=first_data):
+for r, (p, price, team) in enumerate(AUCTION_ROWS, start=first_data):
     au.cell(row=r, column=1, value=p)
     pc = au.cell(row=r, column=2, value=price); pc.number_format = MONEY
     au.cell(row=r, column=3, value=team)
@@ -164,7 +220,7 @@ for i, h in enumerate(bal_hdr, start=1):
 
 for t in range(1, NUM_TEAMS + 1):
     r = 3 + t
-    bal.cell(row=r, column=1, value="Team %d" % t).alignment = left
+    bal.cell(row=r, column=1, value=TEAMS[t - 1]).alignment = left
     p = bal.cell(row=r, column=2, value=PURSE); p.number_format = MONEY; p.alignment = right
     s = bal.cell(row=r, column=3,
                  value="=SUMIF(Auction!$C$%d:$C$%d,$A%d,Auction!$B$%d:$B$%d)"
@@ -206,8 +262,13 @@ for col in ("B", "C", "D", "E"):
 # =========================================================================
 # SHEETS 3..17 : ONE PER TEAM
 # =========================================================================
+def tab_name(name):
+    # Excel tab: <=31 chars, none of : \ / ? * [ ]
+    safe = name.translate({ord(ch): " " for ch in ':\\/?*[]'})
+    return safe[:31]
+
 for t in range(1, NUM_TEAMS + 1):
-    ws = wb.create_sheet("Team %d" % t)
+    ws = wb.create_sheet(tab_name(TEAMS[t - 1]))
     ws.sheet_properties.tabColor = BLUE
     bal_row = 3 + t   # matching row on Balance sheet
 
