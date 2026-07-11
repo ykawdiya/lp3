@@ -15,6 +15,8 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.formula import ArrayFormula
 from openpyxl.workbook.properties import CalcProperties
 from openpyxl.utils import get_column_letter
+from players_data import ALL_PLAYERS
+import re, unicodedata
 
 NUM_TEAMS = 15
 PURSE = 100.00
@@ -106,114 +108,30 @@ assert len(TEAMS_DATA) == NUM_TEAMS
 # flattened auction rows: (player, price, team)
 AUCTION_ROWS = [(pl, amt, name) for name, roster in TEAMS_DATA for pl, amt in roster]
 
-# ---- player metadata (from IPL PLAYERS LIST) -----------------------------
-# player -> (Role, Hand, Country, City).  Role/Hand from Grade A/B/C batting-
-# or bowling-style; Country/City only exist in the list's Grade D section.
-# Blanks = not present in the provided players list.
-PLAYER_META = {
-    'Rohit Sharma': ('Batsman', 'Right', '', ''),
-    'Kartik Tyagi': ('Bowler', 'Right', '', ''),
-    'Kuldeep Yadav': ('Bowler', 'Left', '', ''),
-    'Hugh Weibgen': ('Batsman', '', 'Australia', ''),
-    'Matthew Potts': ('Bowler', '', 'England', ''),
-    'Chamika Karunaratne': ('All Rounder', 'Right', 'Sri Lanka', ''),
-    'Karun Nair': ('Batsman', 'Right', '', ''),
-    'Sachin Baby': ('Batsman', '', 'India', 'Kerala'),
-    'Anrich Nortje': ('Bowler', 'Right', '', ''),
-    'Navdeep Saini': ('Bowler', 'Right', '', ''),
-    'Harnoor Singh': ('Batsman', 'Left', '', ''),
-    'Swastik Chikara': ('Batsman', 'Right', '', ''),
-    'Tilak Varma': ('Batsman', 'Left', '', ''),
-    'Dawid Malan': ('Batsman', '', 'England', ''),
-    'Haris Rauf': ('Bowler', '', 'Pakistan', ''),
-    'George Scrimshaw': ('Bowler', '', 'England', ''),
-    'Hasan Ali': ('Bowler', '', 'Pakistan', ''),
-    'Usma Mir': ('Bowler', '', 'Pakistan', ''),
-    'Jimmy Neesham': ('All Rounder', 'Left', 'New Zealand', ''),
-    'Parth Rekhade': ('All Rounder', '', 'India', 'Vidarbha'),
-    'Dinesh Bana': ('Wicketkeeper', '', 'India', 'Haryana'),
-    'Yuzvendra Chahal': ('Bowler', 'Right', '', ''),
-    'Sandeep Sharma': ('Bowler', 'Right', '', ''),
-    'Sarafaz Khan': ('Batsman', 'Right', '', ''),
-    'Arjun Tendulkar': ('Bowler', 'Left', '', ''),
-    'Ruturaj Gaikwad': ('Batsman', 'Right', '', ''),
-    'Romario Shepherd': ('All Rounder', 'Right', '', ''),
-    'Tom Latham': ('Wicketkeeper', '', 'New Zealand', ''),
-    'Shaheen Shah Afridi': ('Bowler', '', 'Pakistan', ''),
-    'Naseem Shah': ('Bowler', '', 'Pakistan', ''),
-    'Mohammad Amir': ('', '', '', ''),
-    'Akhil': ('', '', '', ''),
-    'Devdutt Padikkal': ('Batsman', 'Left', '', ''),
-    'Vaibhav Suryavanshi': ('Batsman', 'Left', '', ''),
-    'Sikandar Raza': ('All Rounder', 'Right', 'Zimbabwe', ''),
-    'Ashutosh Sharma': ('Batsman', 'Right', '', ''),
-    'Dharmendrasinh Jadeja': ('Bowler', '', 'India', 'Saurashtra'),
-    'Sameer Rizvi': ('Batsman', 'Right', '', ''),
-    'T. Natarajan': ('Bowler', 'Left', '', ''),
-    'Umesh Yadav': ('Bowler', 'Right', '', ''),
-    'Liam Livingstone': ('All Rounder', 'Right', '', ''),
-    'Rahul Tripathi': ('Batsman', 'Right', '', ''),
-    'Suryakumar Yadav': ('Batsman', 'Right', '', ''),
-    'Tim Seifert': ('Wicketkeeper', '', 'New Zealand', ''),
-    'Spencer Johnson': ('Bowler', 'Left', '', ''),
-    'Lhuan-dré Pretorius': ('Batsman', '', 'South Africa', ''),
-    'KL Rahul': ('Wicketkeeper', 'Right', '', ''),
-    'Angkrish Raghuvanshi': ('Batsman', 'Right', '', ''),
-    'Mohammed Siraj': ('Bowler', 'Right', '', ''),
-    'Baba Indrajith': ('Batsman', '', 'India', 'Tamil Nadu'),
-    'Nitish Rana': ('Batsman', 'Left', '', ''),
-    'Ben McKinney': ('Batsman', '', 'England', ''),
-    'Keshav Maharaj': ('Bowler', '', 'South Africa', ''),
-    'Abrar Ahmed': ('Bowler', '', 'Pakistan', ''),
-    'Faf Du Plesis': ('Batsman', 'Right', '', ''),
-    'Rajat Patidar': ('Batsman', 'Right', '', ''),
-    'Rinku Singh': ('Batsman', 'Left', '', ''),
-    'Sai Sudharsan': ('Batsman', 'Left', '', ''),
-    'Ishaan Kishaan': ('Wicketkeeper', 'Left', '', ''),
-    'Govinda Poddar': ('All Rounder', '', 'India', 'Odisha'),
-    'Sanju Samson': ('Wicketkeeper', 'Right', '', ''),
-    'Dewald Brevis': ('Batsman', 'Right', '', ''),
-    'Mayank Dagar': ('All Rounder', '', 'India', 'Himachal Pradesh'),
-    'Abhishek Sharma': ('Batsman', 'Left', '', ''),
-    'Shaik Rasheed': ('Batsman', 'Right', '', ''),
-    'Chetan Sakariya': ('Bowler', 'Left', '', ''),
-    'Quinton de Kock': ('Wicketkeeper', 'Left', '', ''),
-    'Joe Root': ('Batsman', '', 'England', ''),
-    'Virat Kohli': ('Batsman', 'Right', '', ''),
-    'Vidwath Kaverappa': ('Bowler', 'Right', '', ''),
-    'Siddharth Desai': ('Bowler', '', 'India', 'Gujarat'),
-    'Ishant Sharma': ('Bowler', 'Right', '', ''),
-    'Deepak Hooda': ('All Rounder', 'Right', '', ''),
-    'Sam Konstas': ('Batsman', '', 'Australia', ''),
-    'Jitesh Sharma': ('Wicketkeeper', 'Right', '', ''),
-    'Shubman Gill': ('Batsman', 'Right', '', ''),
-    'Mitchell Starc': ('Bowler', 'Left', '', ''),
-    'Jasprit Bumrah': ('Bowler', 'Right', '', ''),
-    'Moeen Ali': ('All Rounder', 'Left', '', ''),
-    'Will Jacks': ('All Rounder', 'Right', '', ''),
-    'Dasun Shanaka': ('All Rounder', 'Right', 'Sri Lanka', ''),
-    'Amit Shukla': ('All Rounder', '', 'India', 'Services'),
-    'Abhishek Powel': ('', '', '', ''),
-    'Harpreet Bhatia': ('Batsman', 'Left', '', ''),
-    'Musheer Khan': ('Batsman', 'Right', '', ''),
-    'Avesh Khan': ('Bowler', 'Right', '', ''),
-    'MS Dhoni': ('Wicketkeeper', 'Right', '', ''),
-    'Glenn Maxwell': ('All Rounder', 'Right', '', ''),
-    'Tom Bruce': ('Batsman', '', 'New Zealand', ''),
-    'Harry Dixon': ('Batsman', '', 'Australia', ''),
-    'Ajinkya Rahane': ('Batsman', 'Right', '', ''),
-    'Priyansh Arya': ('Batsman', 'Left', '', ''),
-    'Jason Holder': ('All Rounder', 'Right', 'West Indies', ''),
-    'Kagiso Rabada': ('Bowler', 'Right', '', ''),
-    'Heinrich Klassen': ('Wicketkeeper', 'Right', '', ''),
-    'Nikhil Gangta': ('Batsman', '', 'India', 'Himachal Pradesh'),
-    'Hardik Pandya': ('All Rounder', 'Right', '', ''),
-    'Shakib Al Hasan': ('All Rounder', 'Left', 'Bangladesh', ''),
-    'Nehal Wadhera': ('Batsman', 'Left', '', ''),
-    'Rishabh Pant': ('Wicketkeeper', 'Left', '', ''),
-    'Wiaan Mulder': ('All Rounder', 'Right', 'South Africa', ''),
-    'Maheesh Theekshana': ('Bowler', 'Right', '', ''),
-}
+# ---- build the full auction pool + sold lookup ---------------------------
+def norm(s):
+    if s is None: return ""
+    s = unicodedata.normalize("NFKD", str(s)).encode("ascii", "ignore").decode()
+    s = re.sub(r"[^a-z0-9 ]", " ", s.lower())
+    s = re.sub(r"\b(jr|sr|the)\b", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+# auction spelling -> players-list canonical spelling
+ALIAS = {"Usma Mir": "Usama Mir", "Sarafaz Khan": "Sarfaraz Khan",
+         "Faf Du Plesis": "Faf du Plessis", "Ishaan Kishaan": "Ishan Kishan",
+         "Heinrich Klassen": "Heinrich Klaasen"}
+
+# sold info (price, team) keyed by canonical normalized name
+SOLD = {norm(ALIAS.get(p, p)): (amt, tm) for p, amt, tm in AUCTION_ROWS}
+
+# POOL = every listed player (name, role, hand, country, city, base, grade),
+# then any bought player that is not in the list (blank metadata).
+POOL = list(ALL_PLAYERS)
+_seen = {norm(p[0]) for p in POOL}
+for p, amt, tm in AUCTION_ROWS:
+    if norm(ALIAS.get(p, p)) not in _seen:
+        POOL.append((p, "", "", "", "", "", ""))
+        _seen.add(norm(p))
 
 wb = Workbook()
 wb.calculation = CalcProperties(fullCalcOnLoad=True)   # force recalc on open
@@ -226,7 +144,7 @@ au.title = "Auction"
 au.sheet_properties.tabColor = NAVY
 
 # Title band
-au.merge_cells("A1:D1")
+au.merge_cells("A1:F1")
 c = au["A1"]
 c.value = "🏏  CRICKET AUCTION  —  MASTER LIST"
 c.font = font(bold=True, size=16, color=WHITE)
@@ -234,18 +152,18 @@ c.fill = fill(NAVY)
 c.alignment = center
 au.row_dimensions[1].height = 30
 
-au.merge_cells("A2:D2")
+au.merge_cells("A2:F2")
 c = au["A2"]
-c.value = ("Enter every sold player below. Prices are in CRORES  (1.20 = 1cr 20L, "
-           "2.00 = 2cr).  Pick the team from the drop-down. Role fills in from the "
-           "Players sheet. Use the filter arrows to group by Role or Team.")
+c.value = ("Every player is listed below. For each SOLD player type the Price "
+           "(CRORES: 1.20 = 1cr 20L) and pick the buying Team from the drop-down. "
+           "Role / Base / Grade are pre-filled. Filter by Grade, Role or Team.")
 c.font = font(italic=True, size=9, color="555555")
 c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
 c.fill = fill(GREY)
 au.row_dimensions[2].height = 28
 
 # Header row (row 4)
-hdr = ["Player", "Price (Cr)", "Team", "Role"]
+hdr = ["Player", "Price (Cr)", "Team", "Role", "Base (Cr)", "Grade"]
 for i, h in enumerate(hdr, start=1):
     cell = au.cell(row=4, column=i, value=h)
     cell.font = font(bold=True, color=WHITE)
@@ -258,15 +176,26 @@ au.column_dimensions["A"].width = 30
 au.column_dimensions["B"].width = 14
 au.column_dimensions["C"].width = 22
 au.column_dimensions["D"].width = 15
+au.column_dimensions["E"].width = 11
+au.column_dimensions["F"].width = 8
 
-# Real bid data (grouped by team, in roster order)
+# Full player pool. Name + Base + Grade for everyone; Price & Team are
+# prefilled for players already sold and left blank for the rest.
 first_data = 5
-for r, (p, price, team) in enumerate(AUCTION_ROWS, start=first_data):
-    au.cell(row=r, column=1, value=p)
-    pc = au.cell(row=r, column=2, value=price); pc.number_format = MONEY
-    au.cell(row=r, column=3, value=team)
+for i, (pname, prole, phand, pctry, pcity, pbase, pgrade) in enumerate(POOL):
+    r = first_data + i
+    au.cell(row=r, column=1, value=pname)
+    price, team = SOLD.get(norm(pname), ("", ""))
+    if price != "":
+        pc = au.cell(row=r, column=2, value=price); pc.number_format = MONEY
+    if team:
+        au.cell(row=r, column=3, value=team)
+    if pbase != "":
+        au.cell(row=r, column=5, value=pbase)
+    if pgrade:
+        au.cell(row=r, column=6, value=pgrade)
 
-last_data = first_data + len(AUCTION_ROWS) - 1
+last_data = first_data + len(POOL) - 1
 
 # style the data-entry area; Role (col D) is looked up from the Players sheet
 for r in range(first_data, DATA_LAST + 1):
@@ -276,12 +205,14 @@ for r in range(first_data, DATA_LAST + 1):
     d = au.cell(row=r, column=4,
                 value='=IFERROR(T(VLOOKUP($A%d,Players!$A:$E,2,FALSE)),"")' % r)
     d.border = border_all; d.alignment = center
+    e = au.cell(row=r, column=5); e.border = border_all; e.alignment = right; e.number_format = MONEY
+    f = au.cell(row=r, column=6); f.border = border_all; f.alignment = center
     if r % 2 == 0:
-        for col in (1, 2, 3, 4):
+        for col in (1, 2, 3, 4, 5, 6):
             au.cell(row=r, column=col).fill = fill(GREY)
 
-# filter arrows over the header so bids can be grouped/sorted by Role or Team
-au.auto_filter.ref = "A4:D%d" % last_data
+# filter arrows over the header -> group/sort by Grade, Role or Team
+au.auto_filter.ref = "A4:F%d" % last_data
 
 # Data-validation drop-down for the Team column (list = Balance!A2:A16)
 dv = DataValidation(type="list",
@@ -295,15 +226,15 @@ au.add_data_validation(dv)
 dv.add("C%d:C%d" % (first_data, DATA_LAST))
 
 # little running totals top-right for convenience
-au["E4"] = "Total sold"
-au["E4"].font = font(bold=True)
-au["F4"] = "=COUNTA(A%d:A%d)" % (first_data, DATA_LAST)
-au["E5"] = "Total spend (Cr)"
-au["E5"].font = font(bold=True)
-au["F5"] = "=SUM(B%d:B%d)" % (first_data, DATA_LAST)
-au["F5"].number_format = MONEY
-au.column_dimensions["E"].width = 16
-au.column_dimensions["F"].width = 12
+au["H4"] = "Pool size";        au["H4"].font = font(bold=True)
+au["I4"] = "=COUNTA(A%d:A%d)" % (first_data, DATA_LAST)
+au["H5"] = "Players sold";     au["H5"].font = font(bold=True)
+au["I5"] = "=COUNTA(C%d:C%d)" % (first_data, DATA_LAST)
+au["H6"] = "Total spend (Cr)"; au["H6"].font = font(bold=True)
+au["I6"] = "=SUM(B%d:B%d)" % (first_data, DATA_LAST)
+au["I6"].number_format = MONEY
+au.column_dimensions["H"].width = 16
+au.column_dimensions["I"].width = 10
 
 # =========================================================================
 # SHEET 2 : BALANCE  (source of truth for team names)
@@ -542,25 +473,27 @@ summ.sheet_view.showGridLines = False
 # =========================================================================
 pl = wb.create_sheet("Players")
 pl.sheet_properties.tabColor = "555555"
-pl.merge_cells("A1:E1")
+pl.merge_cells("A1:G1")
 c = pl["A1"]
 c.value = "PLAYER INFO  (edit here — Role/Hand/Country/City feed the other sheets)"
 c.font = font(bold=True, size=12, color=WHITE); c.fill = fill("555555"); c.alignment = center
 pl.row_dimensions[1].height = 24
-for i, h in enumerate(["Player", "Role", "Hand", "Country", "City"], start=1):
+for i, h in enumerate(["Player", "Role", "Hand", "Country", "City", "Base (Cr)", "Grade"], start=1):
     cell = pl.cell(row=2, column=i, value=h)
     cell.font = font(bold=True, color=WHITE); cell.fill = fill(BLUE)
     cell.alignment = center; cell.border = border_all
 # rows in auction order; blanks where the players list had no info
 pr = 3
-for player, _price, _team in AUCTION_ROWS:
-    role, hand, country, city = PLAYER_META.get(player, ("", "", "", ""))
-    for col, v, algn in ((1, player, left), (2, role, center), (3, hand, center),
-                         (4, country, left), (5, city, left)):
-        cell = pl.cell(row=pr, column=col, value=v)
+for pname, prole, phand, pctry, pcity, pbase, pgrade in POOL:
+    vals = [(1, pname, left), (2, prole, center), (3, phand, center),
+            (4, pctry, left), (5, pcity, left), (6, pbase, right), (7, pgrade, center)]
+    for col, v, algn in vals:
+        cell = pl.cell(row=pr, column=col, value=(v if v != "" else None))
         cell.alignment = algn; cell.border = border_all
+        if col == 6 and v != "":
+            cell.number_format = MONEY
     if pr % 2 == 0:
-        for col in range(1, 6):
+        for col in range(1, 8):
             pl.cell(row=pr, column=col).fill = fill(GREY)
     pr += 1
 pl.freeze_panes = "A3"
@@ -569,6 +502,8 @@ pl.column_dimensions["B"].width = 13
 pl.column_dimensions["C"].width = 8
 pl.column_dimensions["D"].width = 14
 pl.column_dimensions["E"].width = 16
+pl.column_dimensions["F"].width = 9
+pl.column_dimensions["G"].width = 7
 
 # =========================================================================
 out = "Cricket_Auction_Tracker.xlsx"
